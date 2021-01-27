@@ -1,0 +1,16 @@
+## Drone 1.0 版本寫法
+kind: pipeline
+type: docker # 在 Docker 內部執行管道命令
+name: clone # 可自行定義的名稱
+
+steps:
+  - name: build-golang # 事件一：可自行定義的名稱
+    image: neil605164/plugin-govendor # 使用 neil605164/plugin-govendor  容器
+    commands: # 需執行的指令
+      - mkdir -p /usr/local/go/src/${DRONE_REPO_NAME} # 於 goroot 建立專案名稱的空資料夾
+      - ls -al vendor # 查看當前 vendor 資料夾(尚未編譯完成的 code)
+      - rsync -r  /drone/src/* /usr/local/go/src/${DRONE_REPO_NAME} # 將 clone 的專案複製到 goroot 底下
+      - cd /usr/local/go/src/${DRONE_REPO_NAME} # 移動至 goroot 專案底下
+      - govendor sync # 編譯 golang 程式碼
+      - rsync -r /usr/local/go/src/${DRONE_REPO_NAME}/* /drone/src # 將編譯後的程式在複製回 drone 預設 path
+      - ls -al vendor # 查看當前 vendor 資料夾(已經編譯完成的 code)

@@ -1,0 +1,38 @@
+## Drone 1.0 版本寫法
+kind: pipeline
+type: docker # 在 Docker 內部執行管道命令
+name: clone # 可自行定義的名稱
+
+steps:
+  - name: build-golang # 事件一：可自行定義的名稱
+    image: neil605164/plugin-govendor # 使用 neil605164/plugin-govendor  容器
+    commands: # 需執行的指令
+      - mkdir -p /usr/local/go/src/${DRONE_REPO_NAME} # 於 goroot 建立專案名稱的空資料夾
+      - ls -al vendor # 查看當前 vendor 資料夾(尚未編譯完成的 code)
+      - rsync -r  /drone/src/* /usr/local/go/src/${DRONE_REPO_NAME} # 將 clone 的專案複製到 goroot 底下
+      - cd /usr/local/go/src/${DRONE_REPO_NAME} # 移動至 goroot 專案底下
+      - govendor sync # 編譯 golang 程式碼
+      - rsync -r /usr/local/go/src/${DRONE_REPO_NAME}/* /drone/src # 將編譯後的程式在複製回 drone 預設 path
+      - ls -al vendor # 查看當前 vendor 資料夾(已經編譯完成的 code)
+  - name: build-image-push-harbor # 事件二：可自行定義的名稱
+    image: plugins/docker # 使用 plugins/docker  容器
+    settings:
+      username: # harbor 私有庫帳號
+        from_secret: docker_username
+      password: # harbor 私有庫密碼
+        from_secret: docker_password
+      repo: <harbor url>/library/golang-hello # harbor 私有庫存放位置
+      tags: latest # harbor image tag( 也可以利用 ${DRONE_TAG} 自動取得 push 到 gitlab 的版號)
+      registry: <harbor url> # harbor 私有庫網址
+  - name: k8s-deploy # 事件三：可自行定義的名稱
+    image: quay.io/honestbee/drone-kubernetes # 使用 quay.io/honestbee/drone-kubernetes  容器
+    settings:
+      kubernetes_server: <K8S server url> # K8S master url
+      namespace: <namespace name> # 服務所屬的 namespace
+      deployment: <deployment name> # 服務所屬的 deployment
+      repo: <inmage repo path> # 服務所用的 image 來源
+      container: <container name> # 服務的 container 名稱
+      tag: latest-dev # 服務的新版板號，可替換成變數，ex: ${DRONE_TAG}
+      kubernetes_token: # K8S 驗證 token
+        from_secret: kubernetes_token
+    debug: true
